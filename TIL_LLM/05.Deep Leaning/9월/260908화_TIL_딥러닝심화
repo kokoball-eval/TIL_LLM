@@ -1,0 +1,71 @@
+# 📚 [TIL] Hugging Face Trainer 기반 텍스트 분류 Fine-tuning 파이프라인과 오류 분석(Error Analysis)
+---
+## 💡 오늘의 학습 총평
+이전에 다루었던 머신러닝 및 딥러닝 파이프라인 개념들과 맞닿아 있어 전반적인 내용이 생각보다 친숙하게 다가왔고, 덕분에 진입 장벽 없이 수월하게 몰입할 수 있었다. 
+
+기본 개념이 탄탄히 잡혀 있다 보니 복습 퀴즈에서도 좋은 성과를 낼 수 있었고, 여세를 몰아 실습 코딩 문제까지 지체 없이 빠르게 넘어가 직접 구현해보는 단계로 이어질 수 있었다. 
+
+이론에 대한 이해가 실전 코드 작성의 자신감으로 자연스럽게 연결된 의미 있는 하루였다.
+
+---
+## 📊 어제보다 나아진 점 
+- **개념 습득 속도 향상 및 실습 코딩 진입 가속화**:
+  - 이전 과정(ML/DL 파이프라인)의 개념들의 누적 덕분에 파인튜닝 프로세스를 훨씬 빠르게 이해함
+  - 복습 퀴즈에서 높은 성과를 내며 개념 확인 시간을 단축했고, 그만큼 여유 시간을 확보해 실습 코딩에 빠르게 진입하여 직접 구현해볼 수 있었음
+
+---
+## 🎯 오늘 배운 핵심 내용
+
+### 7-1강: 텍스트 분류 문제 정의와 데이터 점검
+* 모델 학습 코드 작성 전 문제 정의 5요소(입력, 출력, 라벨 규칙, 성공 기준, 실패 리스크)를 명확히 수립해야 실험 방향성과 평가 기준이 흔들리지 않음을 배웠다.
+* `id2label`(정수 id -> 라벨명)과 `label2id`(라벨명 -> 정수 id) 매핑을 생성하여 모델 출력 점수를 사람이 해석할 수 있는 클래스로 연결하는 구조를 확립했다.
+* 결측치, 텍스트 중복뿐만 아니라 입력 텍스트 내 정답 라벨명 포함 여부 등 데이터 누수(Data Leakage) 가능성을 사전에 점검하는 데이터 품질 분석 습관을 익혔다.
+
+---
+
+### 7-2강: DatasetDict, Label Encoding, Split 고정
+* `DatasetDict` 내에서 Train(파라미터 업데이트), Validation(학습 중 평가 및 최적 모델 선택), Test(최종 성능 평가)의 독립적 역할을 분리했다.
+* `train_test_split` 시 `stratify_by_column`을 적용하여 원본 데이터셋의 클래스 불균형 비율을 분할된 각 세트에 일관되게 유지하고, `seed` 고정으로 분할 재현성을 확보했다.
+* Split 간 텍스트 중복 교집합을 사전에 검사하여 모델이 문장을 단순 암기해 검증 점수가 부풀려지는 평가 왜곡을 방지했다.
+
+---
+
+### 7-3강: Tokenization Mapping과 Data Collator
+* `Dataset.map(batched=True)`를 통해 전체 텍스트 컬럼을 `input_ids`, `attention_mask`, `labels` 텐서로 고속 일괄 변환하고 불필요한 메타데이터 컬럼을 제거했다.
+* 고정 길이 패딩 대신 `DataCollatorWithPadding`을 적용하여 미니배치 내 최대 길이에 맞추는 Dynamic Padding 방식으로 메모리 사용 효율을 극대화했다.
+* 배치 내 `input_ids [B, L]`, `attention_mask [B, L]`, `labels [B]`의 Shape와 Dtype을 직접 확인하여 모델 입력 규격을 검증했다.
+
+---
+
+### 7-4강: Sequence Classification Model과 Label Mapping (선택)
+* `AutoModelForSequenceClassification`으로 사전학습 베이스 모델 상단에 분류용 Classification Head가 결합되어 최종 `[B, C]` 형태의 Logits가 출력되는 흐름을 파악했다.
+* 모델 초기화 시 `id2label`과 `label2id`를 config에 주입하여 추론 결과의 클래스명을 자동 연동하고 라벨 뒤바뀜 오류를 원천 차단했다.
+* 입력 배치에 `labels`를 함께 넘기면 모델 내부에서 `CrossEntropyLoss`가 자동 계산되므로 출력단에 별도 Softmax를 수동 적용하지 않는 원리를 정리했다.
+
+---
+
+### 7-5강: compute_metrics와 Accuracy/Macro-F1
+* 라벨 불균형 환경에서 다수 클래스에 편향되어 점수가 왜곡될 수 있는 Accuracy의 한계를 인식하고, 모든 클래스를 동일 비중으로 평가하는 Macro-F1의 필요성을 이해했다.
+* Trainer 평가 단계에서 전달받은 Logits에 `np.argmax(axis=-1)`를 적용해 클래스 인덱스를 추출하고 Scikit-learn 지표 dict를 반환하는 `compute_metrics` 함수를 구현했다.
+* 단순 단일 지표 외에도 클래스별 Precision, Recall, F1 및 Confusion Matrix를 함께 분석하여 모델이 취약한 클래스 쌍을 구체적으로 추적했다.
+
+---
+
+### 7-6강: TrainingArguments와 Trainer 설정
+* `TrainingArguments`를 단순 하이퍼파라미터 세팅이 아닌 실험 재현성 문서로 바라보고, 에포크 단위 검증(`eval_strategy`)과 저장(`save_strategy`) 주기를 동기화했다.
+* `load_best_model_at_end=True`와 `metric_for_best_model="macro_f1"`을 설정하여 학습 종료 시 최고 검증 성능을 낸 체크포인트 가중치를 안전하게 로드하도록 구성했다.
+* Model, Args, Dataset, Collator, Tokenizer, Compute_metrics를 `Trainer` 단일 인터페이스로 엮어 표준화된 PyTorch 학습 루프를 완성했다.
+
+---
+
+### 7-7강: Fine-tuning 실행·평가·Checkpoint 관리
+* `trainer.train()` 실행으로 내부 순전파, 손실 계산, 역전파, 옵티마이저 가중치 업데이트가 자동 반복되는 라이프사이클을 추적했다.
+* 중간 저장 산출물인 `checkpoint`, 검증 지표 기준 최적 상태인 `best model`, 실무 서빙 및 배포를 위한 `final model`의 개념적 차이를 명확히 구분했다.
+* 추론 및 서비스 환경에서의 재현성을 보장하기 위해 모델 가중치(`save_model`)뿐만 아니라 동일한 전처리 규칙을 담은 `tokenizer`와 `run_config.json`을 함께 패키징하여 저장했다.
+
+---
+
+### 7-8강: Error Analysis와 Fine-tuning 리포트
+* 정량적 수치 요약에 그치지 않고, `trainer.predict` 결과 기반의 테스트 예측 테이블(`prediction_df`)을 생성하여 틀린 텍스트 샘플을 정성적으로 전수 검토했다.
+* 모델 확신도(Confidence)를 기준으로 '높은 확신 오류(라벨 모호성, 편향)'와 '낮은 확신 오류(경계선 데이터)'를 분리 추출하여 문제 개선 우선순위를 수립했다.
+* 문제 정의부터 데이터 분할, 학습 파라미터, 성능 지표, 오차 패턴 분석, 한계점 및 향후 조치 방안까지 포함된 재현 가능한 엔지니어링 리포트를 작성했다.

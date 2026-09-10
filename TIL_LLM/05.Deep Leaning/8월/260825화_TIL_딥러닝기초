@@ -1,0 +1,116 @@
+# [TIL] PyTorch Autograd 계산 그래프·역전파 원리와 Dataset·DataLoader 파이프라인
+
+## 0. 금일 학습 체감 난이도
+- [ ] 매우 쉬움
+- [ ] 쉬움
+- [ ] 보통
+- [X] 어려움
+- [ ] 매우 어려움
+
+---
+
+## 1. 금일 학습 총평
+정립된 학습 파이프라인이 있으니 강의 시간에 이해가 안가더라도 빠르게 진도에 맞출 수 있었다.
+
+---
+
+## 2. 어제보다 나아진 점 
+- 이전보다 복습 속도가 빨라졌고, 결과적으로 실습 문제 풀이에 빠르게 접근할 수 있었다.
+- 실습 문제 중 기본(필수) 문제를 복습 퀴즈 간 이미 진행한 느낌이라 심화 문제부터 접근하는 것이 좋을 것 같다.
+
+---
+
+## 3. 오늘 배운 핵심 내용
+
+### 1. 손실 함수(Loss Function)의 역할 및 Reduction
+* **손실 함수의 역할**: 예측값과 정답 간의 차이를 미분 가능한 단일 스칼라(Scalar)로 변환하여 역전파(backward) 기준점을 제공함
+* **Scalar Loss의 필요성**: Autograd 엔진이 단일 기준점으로부터 역방향 미분을 전파하기 위해, 역전파 대상 Loss는 단일 스칼라(Scalar Tensor, shape `torch.Size([])`) 형태여야 함
+* **Reduction 옵션별 동작**:
+  * `'none'`: 배치 내 개별 샘플/원소의 Loss를 텐서 형태로 그대로 유지 (에러 분석 및 샘플별 가중치 적용 시 활용)
+  * `'mean'`: 배치 내 모든 오차의 평균을 반환하며, 배치 크기가 변해도 기울기 스케일을 일정하게 유지 (기본값)
+  * `'sum'`: 배치 내 오차의 총합을 반환하며, 데이터 개수에 비례하여 스케일이 커짐
+
+---
+
+### 2. 문제 유형별 손실 함수 및 입출력 규격
+* **회귀 (Regression)**:
+  * 모델 출력: (B, 1) 형태의 연속적인 실수값
+  * Target 규격: (B, 1) 형태, torch.float32 타입
+  * 추천 함수: nn.MSELoss() (예측값과 타깃의 Shape 일치 확인 필수)
+* **이진 분류 (Binary Classification)**:
+  * 모델 출력: (B, 1) 형태의 단일 Logit
+  * Target 규격: (B, 1) 형태, torch.float32 타입 (0.0 또는 1.0)
+  * 추천 함수: nn.BCEWithLogitsLoss() (모델 끝에 별도의 Sigmoid 레이어를 추가하지 않음)
+* **다중 분류 (Multiclass Classification)**:
+  * 모델 출력: (B, C) 형태의 클래스별 Logits
+  * Target 규격: (B,) 형태, torch.long 타입 (원-핫 벡터가 아닌 0부터 C-1까지의 클래스 인덱스)
+  * 추천 함수: nn.CrossEntropyLoss()
+* **다중 레이블 (Multilabel Classification)**:
+  * 모델 출력: (B, L) 형태의 레이블별 Logits
+  * Target 규격: (B, L) 형태, torch.float32 타입
+  * 추천 함수: nn.BCEWithLogitsLoss() (각 레이블을 독립적인 이진 문제로 동시 처리)
+
+---
+
+### 3. 계산 그래프와 Autograd 메커니즘
+* **계산 그래프(Computation Graph)**:
+  * 순전파(Forward) 시 연산 경로를 추적하여 동적으로 생성되며, 역전파(Backward) 시 Loss에서 파라미터 방향으로 기울기 신호를 전달하는 역추적 경로로 활용
+* **연쇄 법칙(Chain Rule)**:
+  * 합성함수로 연결된 다단계 연산에서 각 단계의 국소적 변화율을 곱하여 최종 Loss에 대한 파라미터의 민감도(Gradient)를 산출하는 원리
+* **requires_grad와 Leaf Tensor**:
+  * `requires_grad=True`: 해당 텐서가 포함된 모든 연산 기록을 계산 그래프에 추적하도록 설정 (모델 파라미터는 기본 활성화)
+  * **Leaf Tensor**: 다른 연산 결과로 생성되지 않은 그래프의 시작점 텐서 (weight, bias 등 파라미터)
+  * **Non-Leaf Tensor**: 레이어를 통과하며 생성된 중간 출력값(Activation)
+* **.grad 저장 원칙**:
+  * `loss.backward()` 실행 시 오직 Leaf Tensor의 `.grad` 속성에만 기울기가 저장되며, 파라미터 Shape와 `.grad` Shape는 정확히 일치함
+
+---
+
+### 4. Optimizer와 PyTorch 학습 루프 5단계
+* **Optimizer와 Learning Rate (lr)**:
+  * SGD: 계산된 기울기 반대 방향으로 단순 이동 (새 파라미터 = 기존 파라미터 - lr * grad)
+  * Adam: 기울기 방향 평균(1차 모멘트)과 크기 제곱 평균(2차 모멘트)을 반영하여 파라미터별 적응적 갱신
+  * lr 설정: 너무 작으면 수렴 지연, 너무 크면 손실 발산(Inf/NaN) 및 진동 발생
+* **학습 파이프라인 5단계**:
+  * 1단계 (`optimizer.zero_grad()`): 이전 스텝의 `.grad`를 초기화 (기본 기울기 덧셈 누적 방지)
+  * 2단계 (`outputs = model(inputs)`): 순전파 연산 및 계산 그래프 동적 생성
+  * 3단계 (`loss = criterion(outputs, targets)`): 예측값과 정답 오차를 스칼라로 산출
+  * 4단계 (`loss.backward()`): 계산 그래프를 역추적하여 Leaf Tensor의 `.grad`에 기울기 계산 및 기록 (파라미터 값 미변경)
+  * 5단계 (`optimizer.step()`): `.grad`에 기록된 기울기를 활용해 실제 파라미터 가중치를 갱신
+
+---
+
+### 5. 그래프 제어 및 분리 도구
+* **`tensor.detach()`**:
+  * 특정 텐서의 수치 데이터는 유지하되 계산 그래프 역전파 경로만 분리
+  * 수치 기록용 변환(`detach().cpu().numpy()`) 등에 활용
+* **`with torch.no_grad():`**:
+  * 코드 블록 내부의 모든 연산에 대해 계산 그래프 추적을 비활성화하여 메모리 절약 및 추론 가속
+* **`tensor.clone()` 및 `detach().clone()`**:
+  * `clone()`: 값은 별도 공간에 복사하지만 그래프 연결은 유지
+  * `detach().clone()`: 계산 그래프와 완전히 분리된 독립된 텐서 복사본 생성 (가중치 백업 및 비교 시 필수)
+
+---
+
+### 6. 핵심 디버깅 및 안전한 평가 원칙
+* **학습(Train) vs 평가(Eval) 모드 분리**:
+  * 학습 모드: `model.train()` 적용 후 5단계 학습 루프 정상 수행
+  * 평가 모드: `model.eval()`(Dropout/BatchNorm 동작 모드 변경)과 `with torch.no_grad():`(그래프 추적 차단)를 반드시 함께 사용하며, 평가 종료 후 다음 학습 전 `model.train()`으로 복귀
+* **주요 점검 체크리스트**:
+  * `.grad`가 None인 경우: 순전파 누락, `detach()` 오용, `requires_grad=False`, `torch.no_grad()` 블록 내 손실 생성 여부 점검
+  * `loss.item().backward()` 호출 금지: Python float 타입은 그래프가 없으므로 텐서인 `loss.backward()`로 호출 필수
+  * 동일 그래프 중복 역전파 방지: 역전파 후 그래프가 자동 해제되므로 1 Forward당 1 Backward 원칙 준수
+
+---
+
+### 7. 데이터 파이프라인: Dataset과 DataLoader
+* **Dataset의 역할 및 구현**:
+  * 데이터셋 전체 크기와 개별 샘플(x, y)을 추출하는 방식을 정의
+  * TensorDataset: 이미 텐서 형태로 준비된 데이터(X, y)를 첫 번째 차원 기준으로 단순 바인딩
+  * Custom Dataset: torch.utils.data.Dataset을 상속받아 두 필수 메서드를 오버라이딩
+    * `__len__(self)`: 전체 샘플 개수 반환 (len(self.features) 또는 shape[0])
+    * `__getitem__(self, idx)`: 인덱스에 해당하는 개별 샘플(x, y) 튜플 반환 (파일 로드, 전처리, Transform 적용)
+* **DataLoader의 역할**:
+  * Dataset을 감싸서 학습 루프에 필요한 미니배치(Mini-batch) 생성, 데이터 셔플(Shuffle), 병렬 로딩(num_workers) 수행
+  * iter() 및 next()를 통해 배치 단위 데이터((B, feature_dim), (B,))를 반복 공급
+  * 첫 배치 추출(`next(iter(loader))`) 후 `batch_x`의 차원 및 `batch_y`의 Dtype(CrossEntropyLoss는 torch.long, BCEWithLogitsLoss는 torch.float32) 사전 확인 필수

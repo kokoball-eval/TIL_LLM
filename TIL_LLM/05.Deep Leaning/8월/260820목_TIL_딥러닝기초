@@ -1,0 +1,51 @@
+# [TIL] PyTorch MLP 기초와 텐서 Shape 완벽 정복 (2-3 ~ 3-5강)
+
+## 0. 금일 학습 체감 난이도
+- [ ] 매우 쉬움
+- [ ] 쉬움
+- [ ] 보통
+- [X] 어려움
+- [ ] 매우 어려움
+
+---
+
+## 1. 금일 학습 총평
+파이토치의 핵심 블록인 퍼셉트론, MLP, nn.Linear, nn.Flatten, nn.Module의 내부 동작 원리를 학습했다. 처음에는 가중치(Weight)의 차원이 왜 거꾸로 저장되는지, 4차원 이미지를 어떻게 다림질(Flatten)해서 선형층에 맞물려야 하는지 등 텐서의 차원(Shape) 개념이 낯설어 헷갈렸다. 하지만 코드를 직접 치는 부담을 내려놓고 입출력 크기 추적과 파라미터 계산 공식 위주로 반복 퀴즈를 풀어보면서, 신경망 모델의 데이터 흐름을 직관적으로 읽어낼 수 있게 되었다.
+
+---
+
+## 2. 어제보다 나아진 점 
+* **Batch 차원 불변 법칙 체득**: 텐서의 맨 앞 숫자(데이터 개수/묶음 크기)는 모델을 통과해도 바뀌지 않고 그대로 유지된다는 점을 확실히 이해함.
+* **가중치 및 파라미터 수 암산 가능**: nn.Linear의 내부 가중치 모양이 (out_features, in_features)인 이유와, 편향(Bias)까지 더한 총 파라미터 수 (in * out) + out 공식을 완벽히 정리함.
+* **이미지 차원 변환(Flatten) 감 잡기**: (N, C, H, W) 4차원 이미지를 nn.Flatten()을 통해 (N, C * H * W)로 다림질하여 선형층의 in_features에 맞춰주는 구조를 자연스럽게 파악함.
+* **nn.Module 표준 구조 이해**: __init__은 부품 준비, forward는 데이터 조리 순서라는 핵심 역할을 명확히 구분할 수 있게 됨.
+
+---
+
+## 3. 오늘 배운 핵심 내용
+
+### 1) 퍼셉트론과 MLP (다층 퍼셉트론)의 등장 배경
+* **단일 퍼셉트론의 한계**: Wx + b = 0 형태의 직선(선형) 하나로만 공간을 가르기 때문에 대각선으로 나뉜 XOR 문제를 풀 수 없음.
+* **MLP의 해결 방식**: 입력층 -> 은닉층 -> 출력층 구조로 층을 쌓고, 중간에 비선형 활성화 함수(ReLU)를 넣어 복잡한 곡선 경계를 형성함.
+
+### 2) nn.Linear 동작 원리와 가중치 구조
+* **역할**: 데이터 개수(Batch)는 유지한 채 각 샘플의 특성(Feature) 개수만 변환함.
+* **가중치 Shape의 비밀**: linear.weight.shape는 수학적 열벡터 표기 및 출력 뉴런별 메모리 정렬을 위해 (out_features, in_features)로 저장됨.
+* **내부 계산식**: Output = X @ weight.T + bias
+* **파라미터 총 개수 공식**:
+  * Total Params = (in_features * out_features) + out_features
+
+### 3) 4차원 이미지와 Flatten 다림질
+* **필요성**: nn.Linear는 1차원 피처 벡터만 입력받으므로, 4차원 이미지 (Batch, Channel, Height, Width)를 2차원 (Batch, Features)로 펼쳐야 함.
+* **nn.Flatten() vs torch.flatten()**:
+  * nn.Flatten(): 모듈형으로, 0번 차원(Batch)을 자동으로 보존(start_dim=1 내장).
+  * torch.flatten(x, start_dim=1): 함수형으로, 반드시 start_dim=1을 명시해야 Batch 차원이 뭉개지지 않음.
+* **선형층 입력 크기**: 첫 번째 nn.Linear의 in_features는 Channels * Height * Width가 됨.
+
+### 4) nn.Module을 활용한 커스텀 모델 클래스
+* **__init__**: 모델에서 사용할 레이어 레고 부품(nn.Flatten, nn.Linear, nn.ReLU 등)을 사전에 정의.
+* **forward**: 입력 텐서 X가 준비된 부품들을 어떤 순서로 통과할지 경로(순전파)를 정의.
+* **호출 원리**: model.forward(x)가 아닌 model(x)로 호출해야 PyTorch의 내부 훅(Hook)과 기울기 추적 시스템이 정상 작동함.
+* **파라미터 유무 구분**:
+  * 학습 파라미터 O: nn.Linear (Weight, Bias 존재)
+  * 학습 파라미터 X: nn.Flatten, nn.ReLU (단순 모양 변경 및 필터링 역할)

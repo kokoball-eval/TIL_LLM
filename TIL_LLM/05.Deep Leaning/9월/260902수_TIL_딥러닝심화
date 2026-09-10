@@ -1,0 +1,104 @@
+# 📚 [TIL] Deep Learning NLP 기초 & 토큰화 파이프라인
+---
+## 💡 오늘의 학습 총평
+생소한 개념들로 느껴지는 부분은 몇몇 있었으나, 머신러닝 심화, 딥러닝 기초에서 했던 부분이 꽤 있어서 접근성은 나쁘지 않았다.
+
+---
+## 📊 어제보다 나아진 점 
+학습 프로세스를 최대한 개선했고, 아직 이게 맞는 방향일지는 모르겠다.
+복습 퀴즈 비중을 대폭 줄이고 실습 진행 비중을 그만큼 늘렸다.
+
+1. 수업 중 AI 정리를 통해 비전공자 입장에서 최대한 개념 학습
+2. 진도 완료 시 바로 실습 돌입하면서 코딩을 통한 실습 이해 증폭 (의도대로 됐는지는 아직 미지수)
+
+
+---
+## 🎯 오늘 배운 핵심 내용
+
+## 1. RNN 구조와 텐서 차원 (1-1강)
+
+### 핵심 텐서 규격
+- `batch_first=True`: 텐서의 첫 번째 축을 배치 크기(B)로 고정 → [B, L, D] ([배치, 시퀀스길이, 입력특징]).
+- 은닉 차원 변환: 입력 특징 크기(D_in)와 관계없이 RNN 레이어를 통과하면 마지막 차원은 지정한 `hidden_size`(H)로 변환됨.
+
+### RNN 출력 구조: output vs h_n
+```python
+output, h_n = rnn(x)  # x: [B, L, D_in]
+```
+- `output` [B, L, H]: 시점 1부터 L까지 매 단어를 읽으며 기록한 전체 시점의 은닉 상태(중간 메모 묶음). 다층 구조일 경우 최상위 층의 출력만 반환.
+- `h_n` [Layer × Direction, B, H]: 마지막 시점(L)까지 모두 읽은 뒤 손에 쥔 각 층·방향별 최종 은닉 상태(최종 요약본 1장).
+- 슬라이싱 계약:
+  - 단층 단방향(`num_layers=1`): `output[:, -1, :] == h_n[0]`
+  - 다층 구조(`num_layers=N`): 최상위 층 기준 `output[:, -1, :] == h_n[-1]` (또는 `h_n[N-1]`)
+
+### RNN vs Transformer 계산 복잡도
+- RNN 정보 경로: 첫 토큰에서 마지막 토큰까지 L - 1단계를 순차 전달 → 시퀀스가 길어지면 기울기 소실(Vanishing Gradient) 및 정보 병목 발생.
+- Transformer Self-Attention: 모든 토큰 쌍의 관계를 한 번에 조회 → 경로 길이는 O(1)이지만, 계산해야 할 어텐션 스코어 원소 수는 L^2개로 증가.
+
+---
+
+## 2. LLM 워크플로우와 태스크 계약 (1-2강)
+
+### 데이터 분할(Split) 원칙
+- Train: 손실(Loss)을 역전파하여 가중치를 갱신하는 단계.
+- Validation: 학습에는 쓰지 않고, 최적의 하이퍼파라미터 및 체크포인트를 선택(모의고사).
+- Test: 모든 선택이 확정된 후 단 1회 최종 일반화 성능을 평가(졸업시험).
+  - ⚠️ 주의: Test 결과를 보고 설정을 수정하면 데이터 누수(Data Leakage) 및 낙관적 편향 발생.
+
+### 태스크별 Logits Shape & 후처리 계약
+| 태스크 | 대표 클래스 | Logits Shape | 후처리 및 평가 |
+|---|---|---|---|
+| 문장 분류 | AutoModelForSequenceClassification | [B, C] | softmax(dim=-1) → argmax(dim=-1) |
+| 텍스트 생성 | AutoModelForCausalLM | [B, L, V] | forward()(1회 점수 계산) vs generate()(반복 루프) |
+
+- max vs argmax:
+  - `max(dim=-1)`: 가장 높은 점수/확률 수치 자체를 추출.
+  - `argmax(dim=-1)`: 가장 높은 점수를 받은 클래스 인덱스 번호(정답 방 번호)를 추출.
+
+---
+
+## 3. NLP 데이터 구조와 Subword 토큰화 (2-1강)
+
+### 토큰화 단위 비교 (Trade-off)
+- Word (어절): 단어 수가 적어 시퀀스는 짧으나, 신조어/오타 시 OOV(Out Of Vocabulary) 발생 및 어휘사전 폭발.
+- Character (음소/음절): OOV는 없으나, 시퀀스가 지나치게 길어지고 의미 단위가 파편화됨.
+- Subword (서브워드, 표준): 자주 등장하는 덩어리는 합치고 드문 단어만 쪼개어 사전 크기와 시퀀스 길이 간의 최적 절충안 달성.
+
+### Namespace 분리
+- `label2id`: 프로젝트 태스크의 클래스 정답 번호 (예: {"economy": 0, "sports": 1}).
+- `token_id`: 토크나이저 어휘사전 고유 번호 (예: [PAD]=0, [CLS]=2).
+- 둘 다 정수(Integer)이지만 완전히 다른 체계이므로 변수명과 데이터 구조를 엄격히 분리 관리.
+
+---
+
+## 4. AutoTokenizer와 BatchEncoding (2-2강)
+
+### 토크나이저 API 구분
+1. `tokenize(text)`: 분할 결과 관찰용 토큰 문자열 리스트 반환.
+2. `convert_tokens_to_ids(tokens)`: 토큰 문자열을 고유 정수 ID 리스트로 변환.
+3. `encode(text)`: 특수 토큰([CLS], [SEP])을 자동으로 추가한 정수 ID 리스트 반환.
+4. `tokenizer(texts, ...)`: 패딩, 트렁케이션, 텐서 변환을 한 번에 처리하여 BatchEncoding 생성 (실제 모델 입력용).
+5. `decode(ids, skip_special_tokens=True)`: 숫자 ID 시퀀스를 사람이 읽을 수 있는 텍스트로 복원.
+
+### BatchEncoding 주요 필드
+- `input_ids` [B, L]: 토큰 ID 정수 텐서 (`torch.long`).
+- `attention_mask` [B, L]: 실제 토큰 위치는 1, 패딩([PAD]) 위치는 0으로 가려주는 마스크.
+
+---
+
+## 5. 동적 패딩과 데이터셋 파이프라인 (2-3강)
+
+### 정적 패딩 vs 동적 패딩
+- 정적 패딩 (`padding="max_length"`): 데이터셋 전체 최대 길이에 맞춰 고정하므로 짧은 문장이 많은 배치에서 심각한 메모리·연산 낭비 초래.
+- 동적 패딩 (`DataCollatorWithPadding`): 
+  - `DatasetDict.map()` 전처리 단계에서는 원래 토큰 길이를 유지 (`padding=False`).
+  - DataLoader가 배치를 생성하는 시점에 현재 배치 내 최장 문장 길이에 맞춰 필요한 만큼만 패딩.
+
+### 필수 검증 계약 (Contract)
+```python
+# 패딩된 위치와 마스크가 0인 위치가 정확히 일치해야 함
+pad_positions = batch["input_ids"].eq(tokenizer.pad_token_id)
+assert torch.equal(pad_positions, batch["attention_mask"].eq(0))
+```
+- 긴 입력을 자를 때는 반드시 `truncation=True`를 명시.
+- `max_length`는 임의 지정이 아니라, 학습 데이터의 토큰 길이 분포(p95, max 등)를 통계적으로 분석한 후 결정.

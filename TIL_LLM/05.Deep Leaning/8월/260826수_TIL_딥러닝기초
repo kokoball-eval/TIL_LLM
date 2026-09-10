@@ -1,0 +1,83 @@
+# [TIL] PyTorch 데이터 파이프라인(Dataset·DataLoader) 구축과 MLP 모델 학습·검증 루프 구현
+
+## 0. 금일 학습 체감 난이도
+- [ ] 매우 쉬움
+- [ ] 쉬움
+- [X] 보통
+- [ ] 어려움
+- [ ] 매우 어려움
+
+---
+
+## 1. 금일 학습 총평
+머신러닝 심화부터 딥러닝 심화까지 그동안 다뤘던 개념들이 종합적으로 연결되는 구간이라 이론적 흐름을 이해하는 데는 큰 무리가 없었다. 
+다만 개념 이해와 별개로 백지 상태에서 코드를 직접 구현하는 손코딩 영역은 여전히 체화가 더 필요함을 느꼈다. 
+특히 실습 심화 문제는 아직 난이도의 벽이 느껴지는 만큼, 조급해하기보다는 전체적인 코드 흐름과 구조 파악에 집중하면서 반복적으로 들여다보며 점진적으로 익숙해져야겠다.
+
+---
+
+## 2. 어제보다 나아진 점 
+- **방대한 학습량에 대한 소화력 및 개념 이해도 향상**:
+오늘 많은 진도를 나갔음에도 불구하고 전반적인 개념을 막힘없이 수월하게 이해하고 소화해내어 큰 성취감을 느낌
+
+- **단계별 코딩 복습을 통한 체화**:
+코딩 문제 풀이 비중을 높여 코드 작성에 대한 익숙도 향상
+난이도별 3단계 복습(쉬움: 빈칸 채우기 -> 보통: 문장 단위 작성 -> 어려움: 전체 코드 직접 작성) 방식을 적용하여 점진적 학습 효과 확인
+
+---
+
+## 3. 오늘 배운 핵심 내용
+
+### 1. PyTorch 데이터 파이프라인 (Dataset & DataLoader)
+* **Dataset vs DataLoader 역할 분리**:
+  * **Dataset**: 개별 데이터 샘플과 정답 라벨(x, y)을 어떻게 보관하고 인덱싱할지 정의
+    * `TensorDataset`: 이미 메모리에 준비된 텐서들을 첫 번째 차원 기준으로 단순 바인딩할 때 사용
+    * `Custom Dataset`: 파일 로딩(이미지, CSV, 텍스트 등) 및 복잡한 전처리가 필요할 때 상속받아 구현 (`__len__`, `__getitem__` 오버라이딩)
+  * **DataLoader**: Dataset을 감싸서 미니배치(Mini-batch) 구성, 셔플(Shuffle), 병렬 로딩(`num_workers`)을 처리하여 학습 루프에 공급
+* **데이터 분할 및 옵션 원칙**:
+  * **Train Loader**: 다양한 데이터 순서로 학습하기 위해 `shuffle=True` 적용
+  * **Validation Loader**: 평가 일관성을 위해 `shuffle=False` 적용
+  * **Train/Valid Split**: 재현성을 위해 시드가 고정된 Generator(`torch.Generator().manual_seed(42)`)를 전달하여 `random_split` 수행
+* **파이프라인 사전 점검**:
+  * 모델에 전체 데이터를 전달하기 전, `batch_x, batch_y = next(iter(train_loader))`로 첫 배치를 추출하여 Shape와 Dtype(입력은 `torch.float32`, 분류 타깃은 `torch.long`)을 반드시 확인
+
+---
+
+### 2. nn.Module 기반 MLP 모델 구조 및 호출 흐름
+* **`nn.Module` 핵심 구성**:
+  * `__init__(self)`: 모델에 사용할 레이어 부품(`nn.Linear`, `nn.ReLU` 등)을 선언 및 준비
+  * `forward(self, x)`: 입력 텐서가 레이어를 거쳐 출력(Logits)으로 변환되는 순전파 흐름을 정의
+* **호출 원리**:
+  * `model(x)` 호출 시 내부적으로 훅(Hook) 처리와 함께 `forward(x)`가 자동 실행됨
+  * 차원 변화 추적: `(B, input_dim)` -> `(B, hidden_dim)` -> `(B, num_classes)`
+
+---
+
+### 3. 학습 루프(Train) vs 검증 루프(Validation) 완벽 분리
+* **Train Loop (파라미터 갱신)**:
+  * `model.train()`: Dropout 활성화 및 BatchNorm을 학습 모드로 설정
+  * 5단계 파이프라인: `optimizer.zero_grad()` -> `outputs = model(inputs)` -> `loss = criterion(outputs, labels)` -> `loss.backward()` -> `optimizer.step()`
+* **Validation Loop (성능 평가)**:
+  * `model.eval()`: Dropout 비활성화 및 BatchNorm을 평가 모드로 전환
+  * `with torch.no_grad():`: 불필요한 계산 그래프 생성을 차단하여 메모리를 절약하고 속도 향상
+  * 검증 루프 내에서는 `backward()` 및 `optimizer.step()` 호출을 절대 금지
+
+---
+
+### 4. 메트릭 계산, 로깅 및 학습 파이프라인
+* **정확도(Accuracy) 계산 메커니즘**:
+  * 다중 분류 모델의 출력인 Logits에 `logits.argmax(dim=1)`을 적용하여 가장 큰 점수를 가진 클래스 인덱스를 추출
+  * `(preds == labels).sum().item()`으로 맞춘 개수를 집계하여 전체 데이터 수로 나누어 계산
+* **Loss와 Accuracy의 역할 차이**:
+  * **Loss**: 미분 가능한 연속적인 수치로 역전파를 통해 파라미터를 업데이트하는 최적화 기준
+  * **Accuracy**: 사람이 직관적으로 모델의 성능을 판단하는 비연속적 평가 지표
+* **Epoch별 로깅 및 시각화**:
+  * 각 Epoch마다 `train_loss`, `train_acc`, `valid_loss`, `valid_acc`를 History 딕셔너리에 기록하여 과적합(Overfitting) 발생 여부를 시각화로 모니터링
+
+---
+
+### 5. 핵심 디버깅 및 구현 체크포인트
+* **배치 손실 누적 계산**: 평균 손실만 단순히 더하지 않고 `total_loss += loss.item() * batch_size` 형태로 샘플 수를 고려하여 정확한 Epoch Loss 산출
+* **Device 불일치 방지**: 모델과 입력 데이터(`inputs`, `labels`)를 반드시 동일한 디바이스(`model.to(device)`, `inputs.to(device)`)로 이동
+* **모드 복구**: Validation 루프가 끝난 뒤 다음 Epoch 학습으로 넘어갈 때 반드시 `model.train()`으로 다시 전환
+* **모델 가중치 저장**: 학습 완료 후 추론 및 재사용을 위해 `torch.save(model.state_dict(), "model.pt")`로 파라미터 상태 저장

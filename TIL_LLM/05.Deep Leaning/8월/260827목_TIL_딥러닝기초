@@ -1,0 +1,85 @@
+# [TIL] Week 5: 실험 관리 & 학습 안정화
+
+## 0. 금일 학습 체감 난이도
+- [ ] 매우 쉬움
+- [ ] 쉬움
+- [ ] 보통
+- [X] 어려움
+- [ ] 매우 어려움
+
+---
+
+## 1. 금일 학습 총평
+9강은 크게 어렵지 않은 내용이었으나 10강부터는 집중이 좀 필요했다.
+복습 퀴즈에서 난이도를 올리니 부족한 점이 계속 생겨서 개념 학습을 집중적으로 실시함.
+금일은 다른 날보다 개념 학습할 부분이 좀 더 많은 느낌이라 비중을 조금 늘렸다.
+
+---
+
+## 2. 어제보다 나아진 점
+- 많은 내용을 진도 나가도 머신러닝 심화때 들었던 내용들이 많아서 
+  좀 더 단어 이해가 빨라졌다.
+
+- **핵심 성과: 당일 개념 복습 프로세스를 심화 실습에 적용** ✨
+  
+  어제: 강의 직후 기본 개념을 복습할 때 
+  "읽기(강의 내용) → 질문하기(AI 퀴즈) → 직접 쓰기(손코딩)"의 3단계 사용
+  
+  오늘은 이 같은 프로세스를 심화 실습에도 적용했다.
+  1) 제공된 심화 실습 문제 **읽기** → 구조와 코드 활용 원리 파악
+  2) "왜 이렇게 설계했을까?" AI 문답 퀴즈 **질문하기** → 원리 학습
+  3) 간단한 손코딩 **직접 쓰기** → 이해 완성
+  
+  → **결과: 난이도 높은 내용도 체계적으로 소화 가능해짐!**
+
+---
+
+## 3. 오늘 배운 핵심 내용 
+
+## 9장: 실험 재현성과 모델 관리 기초
+
+### 9-1강. seed 고정과 재현성 요소
+**핵심:**
+- `set_seed(42)` 호출로 Python, NumPy, PyTorch의 무작위성 제어
+- **Why?** → 같은 코드 = 같은 결과 ∴ 실험 재현성 100% 확보 가능
+- **QA 경험과의 연결:** 버그 리포트에서 "재현 방법 상세히" 강조하는 것처럼, ML도 동일 조건에서 동일 결과 보장 필수
+
+### 9-2강. logging 설계
+**핵심:**
+- epoch별 train_loss, valid_loss, train_acc, valid_acc를 history dict에 누적
+- **Why?** → 마지막 숫자만 보면 과적합/과소적합을 놓침 ∴ **곡선 패턴**으로 조기 발견
+- **실무 활용:** Tensorboard/Wandb로 실시간 모니터링하면 더 효율적
+
+### 9-3강. `state_dict`와 checkpoint 구성
+**핵심:**
+- state_dict: 모델의 학습된 파라미터만 저장 (가볍고 이식성 높음)
+- checkpoint: state_dict + 추가정보(epoch, optimizer, history) 
+  → **학습 중단 후 재개 가능** ∴ 병렬 실험이나 장시간 학습에서 시간 낭비 방지
+
+### 9-4강. 저장/불러오기와 학습 재개
+**핵심:**
+- `torch.save(model.state_dict(), path)` 저장 → `model.load_state_dict(torch.load(path))` 불러오기
+- **Why?** → checkpoint에서 epoch 번호를 읽고 `start_epoch = loaded_epoch + 1`부터 재개
+- **주의:** `torch.save(model, path)` (전체 모델 저장)은 지양 (부피 크고 이식성 낮음)
+
+### 9-5강. 실험 폴더 구조와 결과 관리
+**핵심:**
+- runs/ 아래 `timestamp_experiment_name` 폴더 생성 → config, metrics.csv, checkpoints/, plots/ 구조
+- **Why?** → 나중에 다시 봐도 "어떤 설정으로, 어떤 결과가, 왜 그렇게 나왔는지" 한눈에 파악
+- **게임 QA와의 공통점:** QA 보고서도 "환경정보 - 현상 - 기대 결과 - 첨부파일" 구조 ← 재현성 최우선
+
+---
+
+## 10장: 과적합과 학습 안정화
+
+### 10-1강. 학습 곡선 해석
+**핵심:**
+- train_loss ↓, valid_loss ↓ = Good fit | train_loss ↓, valid_loss ↑ = Overfitting
+- **Why?** → validation loss가 실제 운영 데이터 성능을 나타냄 ∴ valid loss 기준으로 best checkpoint 결정
+- **시각화:** matplotlib으로 epoch별 train/valid loss를 함께 그려서 2번째 epoch부터 과적합 징후 포착
+
+### 10-2강. Overfitting과 Underfitting 진단
+**핵심:**
+- **Overfitting:** train_acc 높음 + valid_acc 낮음 → Dropout/Early Stopping 적용
+- **Underfitting:** train_acc 낮음 + valid_acc 낮음 → 모델 키우기/epoch 늘리기/learning rate 조정
+- **진단 함수:** loss_gap과 acc_gap으로 정량화하면 객관적 판단 가능

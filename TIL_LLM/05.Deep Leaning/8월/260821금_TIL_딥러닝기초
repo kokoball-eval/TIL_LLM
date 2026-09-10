@@ -1,0 +1,60 @@
+# [TIL] PyTorch 4강: 활성화 함수의 필요성과 문제 유형별 출력층 및 손실 함수 설계
+
+## 0. 금일 학습 체감 난이도
+- [ ] 매우 쉬움
+- [ ] 쉬움
+- [ ] 보통
+- [X] 어려움
+- [ ] 매우 어려움
+
+---
+
+## 1. 금일 학습 총평
+개념 이해는 확실히 괜찮게 된 것 같은데 코드 위주의 학습이 많아 조금은 혼란스러움
+
+---
+
+## 2. 어제보다 나아진 점 
+- 핵심 내용에 대한 손코딩 문제를 추가함으로써 취약점을 보강하는 중.
+
+---
+
+## 3. 오늘 배운 핵심 내용
+
+### 1) 비선형성과 활성화 함수 (4-1, 4-2강)
+- 선형 결합의 한계: h = W1 * x + b1, y = W2 * h + b2 일 때 y = (W2 * W1) * x + (W2 * b1 + b2)로 합쳐지므로 선형층만 쌓아서는 XOR 등 비선형 결정 경계를 표현할 수 없음.
+- ReLU (Rectified Linear Unit):
+  - 공식: ReLU(x) = max(0, x)
+  - 텐서의 shape는 유지하며, 음수 값만 0으로 잘라내어 모델에 비선형성을 부여함.
+  - 양수 구간에서는 기울기 1, 음수 구간에서는 0 (지속적으로 음수만 출력되어 학습이 멈추는 현상을 Dead ReLU라 함).
+  - 사용 위치: 은닉층 사이에 배치하며, 출력층 뒤에는 임의로 붙이지 않음.
+
+### 2) 이진 분류 출력층 설계 (4-3강)
+- 구조: 클래스가 2개일 때 단일 기준 점수(Class 1 방향)를 예측하므로 출력 차원은 (B, 1).
+- Sigmoid: 1 / (1 + exp(-x)), 실수를 0 ~ 1 사이의 확률 형태로 매핑.
+- Loss 함수: nn.BCEWithLogitsLoss()
+  - 수치적 안정성을 위해 Sigmoid가 내부 결합되어 있으므로 모델은 Raw Logits를 출력.
+- 규격 체크:
+  - logits: (B, 1) / torch.float32
+  - target: (B, 1) / torch.float32 (정답도 실수 텐서로 매칭)
+- 예측 변환: preds = (torch.sigmoid(logits) >= 0.5).long()
+
+### 3) 다중 분류 출력층 설계 (4-4강)
+- 구조: C개 클래스 각각의 점수를 출력하므로 출력 차원은 (B, num_classes).
+- Softmax: exp(z_i) / sum(exp(z_j)), 클래스 축(dim=1 또는 dim=-1)의 합이 1이 되도록 확률 분포화.
+- Loss 함수: nn.CrossEntropyLoss()
+  - 내부적으로 log_softmax와 NLLLoss를 안정적으로 처리하므로 모델은 Raw Logits를 출력.
+- 규격 체크:
+  - logits: (B, C) / torch.float32
+  - target: (B,) 1차원 / torch.long (정수형 클래스 인덱스)
+- 예측 변환: preds = torch.argmax(logits, dim=1) (Softmax는 순서를 바꾸지 않으므로 Logits에서 바로 argmax 가능)
+
+### 4) 분류 문제 유형별 핵심 비교표
+| 구분 | 이진 분류 (Binary) | 다중 분류 (Multiclass) |
+| :--- | :--- | :--- |
+| 출력 Logits Shape | (batch_size, 1) | (batch_size, num_classes) |
+| 추천 손실 함수 | nn.BCEWithLogitsLoss() | nn.CrossEntropyLoss() |
+| 모델 끝단 활성화 | 없음 (Raw Logits 전달) | 없음 (Raw Logits 전달) |
+| Target Shape | (batch_size, 1) | (batch_size,) (1차원) |
+| Target Dtype | torch.float32 | torch.long (정수) |
+| 예측 Label 추출 | (torch.sigmoid(logits) >= 0.5).long() | torch.argmax(logits, dim=1) |

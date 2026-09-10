@@ -1,0 +1,85 @@
+# [TIL] 과적합과 학습 안정화 / CNN 기초
+
+## 0. 금일 학습 체감 난이도
+- [ ] 매우 쉬움
+- [ ] 쉬움
+- [X] 보통
+- [ ] 어려움
+- [ ] 매우 어려움
+
+---
+
+## 1. 금일 학습 총평
+- 특별히 어려운 내용은 없어 개념을 이해하는데 어렵지 않게 시간을 썼다.
+- 코딩 연결 부분에 좀 더 신경을 썼고 코드 구조가 눈에 보이기 시작했다.
+
+---
+
+## 2. 어제보다 나아진 점 
+- 오늘은 어제와 비슷한 느낌인듯.
+
+---
+
+## 3. 오늘 배운 핵심 내용
+
+## 10장: 과적합과 학습 안정화
+
+### 10-3강. Dropout 적용
+**핵심:**
+- 학습 시 뉴런의 출력을 확률 p로 무작위로 꺼서(0으로 설정) 특정 뉴런에 대한 과도한 의존 방지
+- Inverted Scaling: 학습 중 살아남은 뉴런 값을 1/(1-p)로 미리 스케일업 -> eval 모드에서는 추가 연산 없이 입력 100% 그대로 통과
+- **Why?** -> 앙상블 효과로 모델 일반화 성능 극대화 ∴ `model.train()`과 `model.eval()` 모드 제어 필수
+
+### 10-4강. BatchNorm 적용
+**핵심:**
+- 레이어 사이 중간 출력값(Activation)의 평균과 분산을 정규화하여 학습 속도와 안정성 향상
+- 인자 전달 규칙: `BatchNorm1d(hidden_dim)`, `BatchNorm2d(out_channels)`처럼 배치 크기가 아닌 직전 레이어의 출력 Feature/채널 수 전달
+- **실무 표준 패턴:** 
+  - 은닉층 순서: `Linear -> BatchNorm -> ReLU -> Dropout`
+  - `BatchNorm` 직전 `Linear`는 `bias=False` 선언 (BatchNorm 내부 bias가 대체)
+  - `DataLoader`에 `drop_last=True` 적용 (배치 크기 1일 때 분산 계산 오류 방지)
+
+### 10-5강. Early Stopping과 안정화 실험 정리
+**핵심:**
+- 에포크마다 `valid_loss`를 감시하여 과적합 발생 전 최적 시점에 학습 조기 종료
+- 주요 하이퍼파라미터: `patience`(개선이 없어도 대기하는 에포크 수), `min_delta`(개선으로 인정할 최소 손실 감소 폭)
+- **가중치 복원 필수:** 학습 종료 시점 메모리의 모델은 과적합 상태 ∴ 최종 평가/배포 전 따로 저장해 둔 `best_weights.pt`를 `load_state_dict`로 반드시 복원
+
+---
+
+## 11장: CNN 기초
+
+### 11-1강. 이미지 데이터 구조와 channel
+**핵심:**
+- PyTorch 텐서 표준: `(N, C, H, W)` 형태 (배치 크기 N, 채널 수 C, 높이 H, 너비 W)
+- 흑백 이미지는 C=1, 컬러(RGB) 이미지는 C=3이며, 첫 번째 `Conv2d`의 `in_channels`와 정확히 일치해야 함
+- **차원 변환:** 
+  - 일반 이미지 라이브러리의 `(H, W, C)` 형태는 `.permute(2, 0, 1)`로 변환
+  - 채널이 생략된 흑백 `(N, H, W)` 형태는 `.unsqueeze(1)`로 채널 축 추가
+
+### 11-2강. Convolution, Kernel, Filter
+**핵심:**
+- 국소 연결(Local Connectivity)과 가중치 공유(Weight Sharing)로 이미지 공간 정보를 보존하며 Feature Map 생성
+- 합성곱 연산: 필터와 이미지 영역 간 원소별 곱셈 후 총합을 구하는 상호상관(Cross-correlation) 연산
+- 가중치 Shape: `conv.weight.shape`는 `(out_channels, in_channels, kernel_h, kernel_w)` 구조
+
+### 11-3강. Padding과 Stride
+**핵심:**
+- **Padding:** 테두리에 0을 둘러 가장자리 정보 손실 방지 및 해상도 보존 (K=3, S=1일 때 P=1이면 입력 크기 유지)
+- **Stride:** 필터의 이동 보폭이며, S=2로 설정 시 가로/세로 해상도가 1/2로 축소
+- **출력 크기 공식:** H_out = floor((H_in + 2*P - K) / S + 1)
+
+### 11-4강. Pooling 연산
+**핵심:**
+- **Max Pooling:** 2x2 구역 내 최댓값만 추출하여 사소한 위치 변화에 강건(Translation Invariance)하게 만들고 계산량을 1/4로 압축
+- Shape 변화: `MaxPool2d(2)` 통과 시 H, W는 절반으로 줄어들지만, 채널 수(C)와 배치 크기(N)는 불변
+
+### 11-5강. Feature map shape 확인
+**핵심:**
+- 평탄화: 입체 피처 맵 `(N, C, H, W)`은 `torch.flatten(x, start_dim=1)`을 통해 `(N, C * H * W)` 1차원 벡터로 변환
+- **차원 일치:** 뒤따라오는 `nn.Linear`의 `in_features`는 반드시 `flatten_dim(C * H * W)`과 정확히 일치해야 함
+
+### 11-6강. CNN classifier 구조 연결
+**핵심:**
+- 2단계 분업 구조: 2D 공간 특징을 요약하는 특징 추출기(`Conv + ReLU + MaxPool`) + 최종 클래스 점수를 계산하는 분류기(`Flatten + Linear`)
+- **Logits 반환:** PyTorch의 `CrossEntropyLoss`가 내부에 Softmax를 포함하므로, 모델 출력층 뒤에 Softmax를 붙이지 않고 날것의 점수(Logits)를 그대로 출력

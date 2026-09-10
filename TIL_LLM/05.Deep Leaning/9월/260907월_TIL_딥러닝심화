@@ -1,0 +1,69 @@
+# 📚 [TIL] BERT·GPT 아키텍처 비교와 Hugging Face 생태계
+---
+## 💡 오늘의 학습 총평
+수많은 파이토치 함수와 허깅페이스 문법 폭탄같은 방대한 라이브러리 코드에 압도당할 뻔했으나,
+자잘한 구현 디테일에 매몰되지 않고 가장 중요한 본질에 집중해서 이해하려고 노력했다.
+
+"언제 누구를 골라 써야 하는가"에 초점을 맞춰서 학습하였고, 
+복습 퀴즈를 통해 회고했으나 노력이 좀 많이 필요한 하루였다.
+
+
+---
+## 📊 어제보다 나아진 점 
+특별히 없음.
+
+
+
+---
+## 🎯 오늘 배운 핵심 내용
+
+### 5장 : 사전학습 언어모델과 LM Objective (BERT vs GPT)
+1) 사전학습과 파인튜닝의 역할 분담
+- 사전학습(Pretraining): 대규모 비라벨 텍스트로 일반적인 언어 패턴 및 문맥 상식을 학습
+- 파인튜닝(Fine-tuning): 라벨링된 소규모 도메인 데이터로 특정 실무 문제(Task)에 적응
+
+2) LM Objective의 정의
+- 모델이 사전학습 중 반복해서 푸는 학습 문제 유형이며, 모델의 문맥 시야와 행동 특성을 결정
+
+3) BERT (Encoder-only) 메커니즘
+- 시야: Causal Mask 없이 좌우 모든 토큰을 동시에 참고하는 양방향 문맥(Bidirectional)
+- 학습 목적: 입력 토큰 일부를 가리고 원래 단어를 복원하는 Masked Language Modeling (MLM)
+- 적합한 태스크: 텍스트 분류, 개체명 인식(NER), 문장 간 유사도 검색
+
+4) GPT (Decoder-only) 메커니즘
+- 시야: Causal Mask로 미래 단어를 차단하고 과거~현재 문맥만 확인하는 단방향 문맥
+- 학습 목적: 이전 토큰들을 바탕으로 바로 다음 토큰을 맞히는 Causal Language Modeling (CLM)
+- 학습 vs 생성: 학습은 정답 라벨을 시프트하여 병렬 연산하지만, 생성은 토큰을 하나씩 붙여나가는 순차 반복(Autoregressive)
+- 적합한 태스크: 텍스트 생성, 챗봇 대화, 코드 자동완성, 요약
+
+5) LM Head와 Logits 차원 구분
+- LM Head: 내부 표현 [B, L, D]를 단어 사전 크기 점수표 [B, L, V]로 투영하는 nn.Linear(D, V) 선형 계층
+
+*Logits 추출 위치의 차이*
+- BERT: [MASK] 토큰이 위치한 인덱스 좌표의 점수표 추출
+- GPT: 생성할 다음 단어를 위해 마지막 실제 입력 토큰 위치([:, -1, :]) 점수표 추출
+
+### 6장 : Hugging Face 생태계와 모델 활용
+
+1) Hugging Face Hub 및 Model Card 점검 절차
+- Model ID: organization/repository-name 구조
+- revision: 운영 배포 시 재현성을 위해 main 브랜치 대신 고유 커밋 해시(info.sha) 명시
+- Model Card에서 라이선스(상업적 허용 여부), 의도된 용도, 도메인 한계점(Limitations) 사전 확인
+
+2) 추론 인터페이스 선택 기준
+- pipeline(): 전처리 > 추론 > 후처리를 묶어주는 고수준 API (프로토타입, 빠른 검증용)
+- AutoClass: 토크나이저와 모델을 직접 제어하는 저수준 API (서빙 최적화, 로짓 분석, 파인튜닝용)
+
+3) AutoClass 접미사별 출력 텐서 규격
+- AutoModel: 머리(Head) 없는 베이스 모델 > last_hidden_state [B, L, H] 반환 (logits 없음)
+- AutoModelForSequenceClassification: 문장 분류 전용 > logits [B, C]
+- 반환AutoModelForCausalLM: 단어 생성 전용 > logits [B, L, V] 반환 
+- AutoModelForMaskedLM: 빈칸 복원 전용 > logits [B, L, V] 반환
+
+4) Masked Mean Pooling 원리
+- 베이스 모델의 [B, L, H]를 문장 임베딩 [B, H]로 압축할 때, 패딩([PAD]) 위치를 마스킹으로 제외하고 실제 토큰 수로만 평균 계산
+
+5) 배포 및 재로드 안전 규칙
+- 토큰 ID 불일치 방지를 위해 save_pretrained() 시 모델과 토크나이저를 반드시 동일 폴더에 한 쌍으로 저장
+- 폐쇄망/오프라인 환경 로드 시 local_files_only=True 옵션으로 외부 접속 시도 차단
+- 로컬 재로드 후 원본과 동일한 입력을 넣어 torch.testing.assert_close()로 로짓 일치 여부 검증

@@ -1,0 +1,54 @@
+## 0. 금일 학습 체감 난이도
+- [ ] 매우 쉬움
+- [ ] 쉬움
+- [ ] 보통
+- [ ] 어려움
+- [x] 매우 어려움
+
+---
+
+## 1. 금일 학습 총평
+코드 위주라서 이해하기는 쉽지 않았지만, 흐름만 이해하려고 노력했다.
+
+---
+
+## 2. 어제보다 나아진 점 
+- 머신러닝 심화 진도가 끝났고, 1장 1강부터 다시 복습 과정에 돌입했다.
+- 좀 더 확실히 이해가 되었고, 이제 실습 진행할 것.
+
+---
+
+## 3. 오늘 배운 핵심 내용
+
+### 1) 5장 1강: CV 기반 하이퍼파라미터 탐색과 공정한 후보 선정
+* 공정한 비교 계약 (Fair Comparison Contract)
+  * 단일 Validation 분할의 점수에 의존하지 않고, 동일한 개발 데이터(X_dev), 동일한 Stratified 4-Fold CV, 동일한 평가 지표(불균형 분류를 고려한 AP, Average Precision)를 고정하여 비교함.
+  * Grid Search vs Random Search:
+    * 탐색 범위와 후보 수(각 12개, 48 fits -> 총 96 fits)를 통제하여 탐색 기회의 차이가 성능 차이로 오해되지 않도록 설계.
+    * 탐색법별 최고 점수만으로 우열을 단정하지 않고 주어진 탐색 예산 내 특성을 이해함.
+* 사전 후보 선정 규칙 (Selection Order)
+  * 탐색 결과를 확인하기 전에 코드로 선정 규칙을 먼저 고정:
+    1. 전체 후보 중 최고 CV 평균 AP 탐색.
+    2. 최고 평균에서 절대 차이 0.01 이내인 유효 후보(eligible) 필터링.
+    3. Fold 간 변동(표준편차 std_AP)이 가장 작은 후보 우선 선택 (일반화 안정성 확보).
+    4. 동률 시 계산 비용 및 복잡도 대리 지표인 n_estimators -> max_depth 순으로 해소.
+* Test 세트 봉인(Sealed Test) 원칙
+  * 후보 선정 및 개발 데이터 전체 재학습(refit)이 완료될 때까지 Test 세트는 성능 평가에 절대 쓰지 않으며, 최종 확정된 단 하나의 모델로 1회만 평가함.
+
+---
+
+### 2) 5장 2강: 누수 없는 End-to-End Pipeline과 모델 영속화
+* ColumnTransformer를 통한 열별 전처리 분기
+  * 수치형 파이프라인: SimpleImputer(strategy="median") -> StandardScaler()
+  * 범주형 파이프라인: SimpleImputer(strategy="most_frequent") -> OneHotEncoder(handle_unknown="ignore")
+* 누수(Data Leakage) 없는 불균형 처리 (imblearn.pipeline.Pipeline)
+  * RandomOverSampler 같은 행 변경 샘플러는 CV Fold의 Train 데이터 학습 단계(fit)에서만 동작해야 함.
+  * Fold Validation 평가, Sealed Test 평가, 실서비스 추론(predict, predict_proba) 시에는 샘플러가 건너뛰어져야 데이터 왜곡과 누수를 방지할 수 있음 -> imblearn 파이프라인 활용.
+* Pipeline 전체를 감싸는 GridSearchCV
+  * 파이프라인 객체 전체를 CV에 넘겨 Fold마다 전처리 기준(평균, 중앙값 등)과 리샘플링이 독립적으로 학습되도록 강제함 (classifier__C 튜닝).
+  * refit=True를 통해 최적 파라미터 선정 즉시 X_dev 전체 데이터로 전처리부터 분류기까지 한 번에 재학습.
+* 모델 저장과 복원 (joblib) 재현성 검증
+  * 전처리 상태(imputer, scaler, encoder)와 모델 가중치가 review_pipeline.joblib 단일 파일에 함께 직렬화되어 보관됨.
+  * Reload 후 동일한 새 요청(new_requests)을 주입했을 때:
+    * 예측 확률 점수: np.allclose(before_score, after_score) -> 오차 범위 내 일치 확인.
+    * 0/1 클래스 예측: np.array_equal(before_prediction, after_prediction) -> 완전 일치 확인.
