@@ -1,17 +1,137 @@
-# 📚 [TIL] 
+# 📚 [TIL] LLM API 기초, Pydantic 구조화 출력(Structured Output), 그리고 Tool Calling & 멀티모달 실무 패턴
 ---
 ## 💡 오늘의 학습 총평
 
+- **핵심 통찰: '글짓기 프롬프트'에서 '견고한 입출력 아키텍처'로의 전환**
+  - 이전에는 LLM을 활용한다는 것이 '말을 어떻게 예쁘게 전달할까'라는 프롬프트 문구 작성에 가깝다고 생각했다.
+  - 하지만 오늘 5장부터 9장까지의 여정을 관통하며 배운 본질은, 
+  **"LLM이라는 비결정적이고 신뢰할 수 없는 외부 컴포넌트를 둘러싼 인터페이스 경계선(Boundary)을 소프트웨어 공학적으로 통제하는 일"**이었다.
 
-
+- **향후 계획 및 다짐**
+  - 수식 증명이나 딥러닝 이론의 깊이에 매몰되어 부담을 느끼기보다는, **"기존의 테스팅 및 품질 엔지니어링 역량을 AI 시스템에 어떻게 이식할 것인가"**에 집중하니 학습에 가속도가 붙었다.
 
 ---
 ## 📊 어제보다 나아진 점 
-
-
-
+학습 태도 전환: 수식 증명에 대한 부담을 내려놓고 핵심 맥락 위주로 가볍게 소화
+관점 재정의: 기존 직무 역량을 고도화하기 위한 실용적 도구로 AI 기술을 인식
+심리적 변화: 완벽주의로 인한 스트레스가 사라지고, 실무 적용을 상상하며 흥미와 재미 확보
 
 ---
 ## 🎯 오늘 배운 핵심 내용
 
+## 5장. LLM API 기초 및 프롬프트 정책 설계
 
+### 5-1강 : LLM API 요청/응답 구조 읽기
+- **핵심 개념**: 
+  - OpenAI 공식 SDK의 최신 규격인 **Responses API(`client.responses.create`)** 기본 흐름 습득.
+  - API Key 하드코딩 배제 및 로컬 환경 변수(`os.getenv`) 기반 주입.
+- **파싱 원칙**: 
+  - `response.output[0]` 식별자 하드코딩 금지 (Tool Call, Reasoning 아이템 혼입 방어).
+  - SDK 제공 헬퍼 속성인 `response.output_text` 및 상태 메타데이터(`id`, `status`, `usage`) 파싱 표준화.
+- **QA 체크포인트**: 
+  - API Key 노출 결함(Git/로그/에러 트레이스) 방어.
+  - `status == 'completed'` 검증을 통한 토큰 부족/필터링 미완료 응답 사전 차단.
+
+### 5-2강 : System/Developer Prompt와 응답 정책 설계
+- **핵심 개념**: 
+  - 시스템 상위 지시문(`Developer Prompt`)과 가변 사용자 입력(`User Prompt`)의 관심사 분리.
+  - 프롬프트를 자연어가 아닌 **인터페이스 명세서(Prompt Contract)**로 설계.
+- **Contract 6대 요소**: 
+  - 역할(Role), 맥락(Context), 작업 범위(Scope), 제약/금지사항(Constraints), 출력 형식(Output Format), 성공 기준(Success Criteria).
+- **QA 체크포인트**: 
+  - 정상 입력 외에 정보 부족(역질문), 범위 밖(거절 안내), 민감정보 유입(에코 차단)을 다루는 **Prompt Test Matrix** 구축 및 Fallback 정책 정의.
+
+---
+
+## 6장. 프롬프트 통제 실험과 추론 제어
+
+### 6-1강 : Baseline / Few-shot / 문제 분해와 평가 루브릭
+- **핵심 개념**: 
+  - 프롬프트 수정을 감에 의존하지 않고, 모델/테스트셋/루브릭을 고정한 뒤 한 가지 요소만 변경하는 **통제 실험(A/B Test)** 수행.
+  - 최소 스펙의 `Baseline`으로 취약점을 먼저 도출하고, 오분류가 잦은 경계선(Edge Case)을 정밀 타격하는 `Few-shot` 추가.
+- **QA 체크포인트**: 
+  - 주관적 평가 지양. 
+  - `format_ok`, `correct` 등 코드로 0과 1 판별이 가능한 규칙 기반 루브릭 함수를 작성해 **회귀 테스트 자동화 기반** 마련.
+
+### 6-2강 : Self-Consistency와 Reasoning 모델 프롬프팅
+- **핵심 개념**: 
+  - 단일 호출의 확률적 오류를 극복하기 위해 N회 독립 호출 후 최다 득표 답안을 채택하는 **Self-Consistency(추론 앙상블 다수결)** 적용.
+  - 추론 모델에 긴 생각 과정을 요구하지 않고, 검증 가능한 근거/체크리스트 중심으로 출력 유도.
+- **QA 체크포인트**: 
+  - **다수결의 함정**: 공통된 잘못된 전제(사전 지식 편향)는 투표로 해결 불가 $\rightarrow$ 사실 검증은 검색/DB 도구로 교차 검증 필수.
+  - **토큰 잠식 버그**: 보이지 않는 `reasoning_tokens`가 예산을 잠식해 응답이 잘리는(`incomplete`) 결함 모니터링.
+
+---
+
+## 7장. 구조화 출력(Structured Output)과 다계층 검증
+
+### 7-1강 : JSON Schema 기본과 구조화 출력 설계
+- **핵심 개념**: 
+  - 자연어 파싱의 취약성을 제거하고, 모델과 애플리케이션 간의 명세서인 `JSON Schema` 정의.
+  - `type`, `properties`, `required`, `enum`, 그리고 임의 키 생성을 원천 차단하는 `additionalProperties: False` 적용.
+- **QA 체크포인트**: 
+  - [JSON 문법 검증] $\neq$ [Schema 구조 검증] $\neq$ [비즈니스 사실 검증]의 3단계 검증 방어선 분리.
+
+### 7-2강 : Pydantic 검증과 strict 출력
+- **핵심 개념**: 
+  - Pydantic `BaseModel` 클래스를 통해 [타입 힌트 + 런타임 유효성 검사 + JSON Schema 자동 생성] 일원화.
+  - `client.responses.parse(text_format=Model)`을 활용해 검증된 객체(`response.output_parsed`)로 즉시 수신.
+- **QA 체크포인트**: 
+  - Pydantic의 느슨한 자동 형 변환(Coercion)을 차단하는 `strict=True`와 정의되지 않은 필드를 막는 `extra="forbid"` 설정으로 침묵형 버그 방어.
+
+### 7-3강 : Validation Error 처리와 출력 복구
+- **핵심 개념**: 
+  - 파싱 오류, 스키마 위반, 비즈니스 모순, API 거절(Refusal), 미완료(Incomplete)를 분류하여 적절한 처리 경로로 라우팅.
+  - `@model_validator(mode="after")`를 활용해 필드 간 상호 관계 모순(예: 검토 불필요인데 사유 기재) 검출.
+- **QA 체크포인트**: 
+  - 억지 복구(기본값 임의 채움)는 데이터 오염을 유발하므로 즉시 중단. 
+  - 오류를 명확히 분류하여 **최대 1회 제한적 재요청** 또는 **사람 검토 큐(Human Review Queue)**로 격리.
+
+---
+
+## 8장. 도구 호출(Tool Calling)과 안전 실행 경계
+
+### 8-1강 : Tool Schema와 argument 생성
+- **핵심 개념**: 
+  - Function Calling의 모델-애플리케이션 간 5단계 실행 경계 이해. 모델은 '실행 요청'만 작성하고 실행은 프로그램이 담당.
+  - Strict Tool Schema 원칙(`additionalProperties: False`, 모든 속성 `required` 지정, 선택값은 nullable 처리).
+- **QA 체크포인트**: 
+  - 1차 호출과 결과를 매핑하는 `call_id`의 무결성 보존.
+  - `response.output`을 순회하며 `item.type == 'function_call'`을 명시적으로 필터링.
+
+### 8-2강 : Argument Validation과 함수 실행
+- **핵심 개념**: 
+  - 모델이 생성한 인자(`arguments`)는 **신뢰할 수 없는 외부 입력(Untrusted Input)**으로 취급.
+  - 임의 코드 실행 위험이 있는 `eval()`이나 `globals()`를 배제하고, 사전 등록된 함수만 연결하는 **Allowlist Router** 구현.
+- **QA 체크포인트**: 
+  - 문자열 경로 조작(`../../admin`) 등을 방어하는 Pydantic 정규식(`pattern`) 검증.
+  - 함수 실행 결과는 항상 `{"ok": bool, "error_code": str, "retryable": bool}` 표준 포맷으로 래핑.
+
+### 8-3강 : 최종 응답 생성과 실패 케이스 처리
+- **핵심 개념**: 
+  - 함수 실행 결과를 `function_call_output`으로 모델에 재주입하여 최종 자연어 답변 완성.
+  - 2차 호출 시 이전 턴의 `response.output`(추론, 툴 호출 메타데이터)을 누적 보존하여 컨텍스트 단절 방지.
+- **QA 체크포인트**: 
+  - 단순 조회 Tool과 상태 변경(부작용) Tool 분리.
+  - 부작용 Tool 4대 방어선: **명시적 확인(Confirmation), 권한 검증(Permission), 멱등성 보장(Idempotency), 감사 로그(Audit Log)**.
+  - 무한 루프 방지를 위한 `max_rounds` 탈출 조건 강제.
+
+---
+
+## 9장. 멀티모달(Vision) 파이프라인과 수치 검증
+
+### 9-1강 : 텍스트/이미지 입력과 이미지 분석 지시
+- **핵심 개념**: 
+  - `input_text`와 `input_image`(Base64 data URL / Public URL)를 병합하는 멀티모달 인터페이스 구조.
+  - `detail` 옵션(`low`, `high`, `original`)에 따른 인식률과 입력 토큰/지연시간 간의 트레이드오프 관리.
+- **QA 체크포인트**: 
+  - 모델 성능을 탓하기 전 **해상도, 초점 흐림, 조명, 잘림 등 입력 이미지 데이터 품질 결함** 선제 점검.
+  - 프롬프트에서 **관찰(보이는 텍스트)과 추론(자의적 해석)을 강제로 분리**하여 없는 값을 채워 넣는 환각 방어.
+
+### 9-2강 : 멀티모달 Structured Output과 비용 관계
+- **핵심 개념**: 
+  - 비정형 이미지 분석 결과를 `responses.parse`와 Pydantic을 결합해 구조화 데이터로 추출.
+  - 읽을 수 없는 값은 0이나 빈 문자열이 아닌 `null`/`unknown`으로 처리하고, `review_required` 플래그 및 원본 근거(`evidence`) 수집.
+- **QA 체크포인트**: 
+  - Pydantic 통과 후, 부동소수점 오차를 방지하기 위해 `Decimal(str(val))`을 적용하여 $\sum(\text{수량} \times \text{단가}) == \text{총액}$ 일치 여부를 결정론적 코드로 2차 검증.
+  - `usage.input_tokens`와 환경 변수 단가를 기반으로 이미지 호출 비용/지연시간 모니터링 체계 구축.
