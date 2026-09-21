@@ -1,0 +1,59 @@
+# ─────────────────────────────────────────────────────────────
+# 줄바꿈(EOL) 정책
+#   저장소에는 항상 LF로 저장하고, 체크아웃할 때도 LF를 유지한다.
+#   개인 PC의 core.autocrlf 설정보다 이 파일이 우선한다.
+# ─────────────────────────────────────────────────────────────
+* text=auto eol=lf
+
+# ── 문서 / 노트 ──────────────────────────────────────────────
+*.md            text
+*.txt           text
+*.rst           text
+
+# ── 코드 / 설정 ──────────────────────────────────────────────
+*.py            text diff=python
+*.ipynb         text
+*.json          text
+*.csv           text
+*.tsv           text
+*.yml           text
+*.yaml          text
+*.toml          text
+*.cfg           text
+*.ini           text
+*.sh            text eol=lf
+.gitignore      text
+.gitattributes  text
+.python-version text
+
+# ── Windows 전용 스크립트 (CRLF여야 정상 동작) ───────────────
+*.bat           text eol=crlf
+*.cmd           text eol=crlf
+*.ps1           text eol=crlf
+
+# ── 바이너리 (절대 변환하지 않음) ────────────────────────────
+*.png           binary
+*.jpg           binary
+*.jpeg          binary
+*.gif           binary
+*.webp          binary
+*.ico           binary
+*.pdf           binary
+*.zip           binary
+*.gz            binary
+*.7z            binary
+*.xlsx          binary
+*.docx          binary
+*.pptx          binary
+
+# ── 모델 / 학습 산출물 ───────────────────────────────────────
+*.pkl           binary
+*.joblib        binary
+*.npy           binary
+*.npz           binary
+*.pt            binary
+*.pth           binary
+*.bin           binary
+*.onnx          binary
+*.safetensors   binary
+*.gguf          binary
