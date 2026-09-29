@@ -16,8 +16,8 @@
 |---|---|---|
 | [00-Career](00-Career/) | 취업 세션, 커리어 고민 | — |
 | [10-Course-Log](10-Course-Log/) | 부트캠프 과목별 일일 TIL | 공통 |
-| [20-QA-Engineering](20-QA-Engineering/) | 테스트 기초, 테스트 자동화 | SW QA · SDET |
-| [30-LLM-Evaluation](30-LLM-Evaluation/) | LLM 평가 설계와 지표 | LLM Evaluation |
+| [20-QA-Engineering](20-QA-Engineering/) | 테스트 기초, 테스트 자동화 *(준비 중)* | SW QA · SDET |
+| [30-LLM-Evaluation](30-LLM-Evaluation/) | LLM 평가 설계와 지표 *(준비 중)* | LLM Evaluation |
 | [40-Projects](40-Projects/) | 부트캠프 프로젝트 기록 | 공통 |
 
 ---
@@ -30,9 +30,20 @@
 
 ---
 
+## 학습 방식
+
+강의 하나를 다섯 단계로 소화합니다.
+
+```
+예습 → 강의 → 개념 복습 → 복습 퀴즈 → 실습
+```
+
+학습 보조 도구로 **Claude, ChatGPT, Gemini**를 함께 사용합니다.
+
+---
+
 ## 기록 방식
 
 - 파일명은 `YYMMDD요일_TIL.md` 형식입니다. (예: `260929화_TIL.md`)
 - 강의 TIL에는 **핵심 개념**과 함께, 같은 내용을 QA·테스트 관점에서 다시 본 **QA 체크포인트**를 남깁니다.
-- 강의 자료는 AI(Claude)와 함께 읽으며 해설을 받고 정리합니다.
 - `20-QA-Engineering`, `30-LLM-Evaluation`에는 **직접 설명할 수 있게 된 내용만** 옮깁니다.
