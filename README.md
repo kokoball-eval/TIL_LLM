@@ -26,7 +26,7 @@
 
 | 프로젝트 | 내용 |
 |---|---|
-| [game-bug-triage-llm-eval](40-Projects/game-bug-triage-llm-eval/) | 게임 버그 리포트 트리아지에 쓸 로컬 LLM 비교·선정 (오픈소스 활용 프로젝트) |
+| [game-bug-triage-llm-eval](40-Projects/game-bug-triage-llm-eval/) | 게임 버그 리포트 트리아지에 쓸 로컬 LLM 비교·선정 (오픈소스 활용 프로젝트) → 회귀 게이트·테스트·CI를 갖춘 LLM 평가 체계로 고도화 중 ([저장소](https://github.com/kokoball-eval/game-bug-triage-llm-eval)) |
 
 ---
 
