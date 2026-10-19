@@ -12,6 +12,7 @@ KANT AI 부트캠프 Private LLM 트랙의 과목별 일일 TIL입니다. 폴더
 | [07-Practical-DL-Prompt-Engineering](07-Practical-DL-Prompt-Engineering/) | 실전 딥러닝 · 프롬프트 엔지니어링 | 2026.09 ~ 10 |
 | [09-Data-Pipeline-FastAPI](09-Data-Pipeline-FastAPI/) | 데이터 수집 & API 서버 구축 | 2026.09 |
 | [10-LangChain](10-LangChain/) | LangChain | 2026.09 ~ 10 |
-| [11-Project2-Review](11-Project2-Review/) | 2차 프로젝트 대비 Review (문의 분류·생성) | 2026.10 ~ |
+| [11-Project2-Review](11-Project2-Review/) | 2차 프로젝트 대비 Review (문의 분류·생성) | 2026.10 |
+| [12-RAG](12-RAG/) | RAG (Retrieval-Augmented Generation, 검색 증강 생성) | 2026.10 ~ |
 
 > 08번은 프로젝트 기간이라 [40-Projects](../40-Projects/)로 옮겼습니다.
