@@ -17,5 +17,6 @@ KANT AI 부트캠프 Private LLM 트랙의 과목별 일일 TIL입니다. 폴더
 | [13-Network-Study](13-Network-Study/) | KANT 랩 스터디 「TCP 한 잔 할래요?」 (네트워크 기초, 금요일 10회차) | 2026.10 ~ |
 | [14-Context-Engineering](14-Context-Engineering/) | Context Engineering (입력 구성·메모리·토큰 예산·Prompt Caching·Prompt Injection) | 2026.10 |
 | [15-LLM-Assignment](15-LLM-Assignment/) | LLM 과제 (프롬프트 엔지니어링 · 데이터 수집 API · LangChain) | 2026.10 ~ |
+| [16-LLMOps](16-LLMOps/) | LLMOps (Langfuse 실행 관측 · 평가 · 운영) | 2026.10 ~ |
 
 > 08번은 프로젝트 기간이라 [40-Projects](../40-Projects/)로 옮겼습니다.
