@@ -27,6 +27,7 @@
 | 프로젝트 | 내용 |
 |---|---|
 | [game-bug-triage-llm-eval](40-Projects/game-bug-triage-llm-eval/) | 게임 버그 리포트 트리아지에 쓸 로컬 LLM 비교·선정 (오픈소스 활용 프로젝트) → 회귀 게이트·테스트·CI를 갖춘 LLM 평가 체계로 고도화 중 ([저장소](https://github.com/kokoball-eval/game-bug-triage-llm-eval)) |
+| [Project3-LLMOps](40-Projects/Project3-LLMOps/) | KANT 3차 팀 프로젝트: 해운 PDF 기반 RAG 질의응답 서비스와 세 검색 방식 비교. **judge(LLM 평가) 담당** — RAGAS Faithfulness·LLM-as-a-Judge 4항목 채점, 0점과 빈칸 규칙, 대표 사례 원문 대조 ([팀 저장소](https://github.com/C-Designer/kant_project_3)) |
 
 ---
 
